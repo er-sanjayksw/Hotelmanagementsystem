@@ -1,0 +1,363 @@
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String         @id @default(uuid())
+  name            String
+  email           String         @unique
+  phone           String
+  passwordHash    String
+  role            String         @default("USER")
+  isVerified      Boolean        @default(false)
+  createdAt       DateTime       @default(now())
+  image           String?        @db.Text
+  lastCountryCode String?
+  phoneCode       String         @default("+977")
+  address         String?        @db.Text
+  city            String?
+  country         String?
+  district        String?
+  state           String?
+  zipCode         String?
+  dateOfBirth     DateTime?
+  blogs           Blog[]
+  bookings        Booking[]
+  favorites       Favorite[]
+  notifications   Notification[]
+  reviews         Review[]
+  documents       UserDocument[]
+  vendorProfile   Vendor?
+  permissions     AdminPermission[]
+}
+
+model AdminPermission {
+  id         String @id @default(uuid())
+  userId     String
+  permission String // e.g., 'MANAGE_VENDORS', 'MANAGE_REVIEWS'
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, permission])
+  @@index([userId])
+}
+
+model UserDocument {
+  id                 String   @id @default(uuid())
+  userId             String
+  documentType       String
+  documentUrl        String   @db.Text
+  verificationStatus String   @default("PENDING")
+  uploadedAt         DateTime @default(now())
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "UserDocument_userId_fkey")
+}
+
+model Vendor {
+  id                String             @id @default(uuid())
+  userId            String             @unique
+  businessName      String
+  approvalStatus    String             @default("PENDING")
+  adminFeedback     String?            @db.Text
+  deletionRequest   Boolean            @default(false)
+  isArchived        Boolean            @default(false)
+  archivedAt        DateTime?
+  createdAt         DateTime           @default(now())
+  address           String?            @db.Text
+  city              String?
+  country           String?
+  district          String?
+  state             String?
+  zipCode           String?
+  blogs             Blog[]
+  emergencyContacts EmergencyContact[]
+  hotels            Hotel[]
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Hotel {
+  id              String                @id @default(uuid())
+  vendorId        String
+  name            String
+  location        String
+  country         String?
+  district        String?
+  city            String?
+  street          String?
+  zipCode         String?
+  coverImage      String?               @db.Text
+  registrationDoc String?               @db.Text
+  googleMapsLink  String?               @db.Text
+  description     String                @db.Text
+  status          String                @default("PENDING")
+  isArchived      Boolean               @default(false)
+  archivedAt      DateTime?
+  createdAt       DateTime              @default(now())
+  favorites       Favorite[]
+  vendor          Vendor                @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  hotelAmenities  HotelAmenityMapping[]
+  images          HotelImage[]
+  stayPurposes    HotelPurposeMapping[]
+  reviews         Review[]
+  rooms           Room[]
+
+  @@index([vendorId], map: "Hotel_vendorId_fkey")
+}
+
+model Room {
+  id             String               @id @default(uuid())
+  hotelId        String
+  title          String
+  category       String
+  description    String               @db.Text
+  isVisible      Boolean              @default(true)
+  createdAt      DateTime             @default(now())
+  quantity       Int                  @default(1)
+  stayType       String               @default("SHORT")
+  bookings       Booking[]
+  dynamicPricing DynamicPricing[]
+  reviews        Review[]
+  hotel          Hotel                @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  amenities      RoomAmenityMapping[]
+  images         RoomImage[]
+  pricing        RoomPricing?
+
+  @@index([hotelId], map: "Room_hotelId_fkey")
+}
+
+model RoomAmenity {
+  id    String               @id @default(uuid())
+  name  String               @unique
+  rooms RoomAmenityMapping[]
+}
+
+model RoomAmenityMapping {
+  id        String      @id @default(uuid())
+  roomId    String
+  amenityId String
+  amenity   RoomAmenity @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+  room      Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, amenityId])
+  @@index([amenityId], map: "RoomAmenityMapping_amenityId_fkey")
+}
+
+model HotelAmenity {
+  id     String                @id @default(uuid())
+  name   String                @unique
+  hotels HotelAmenityMapping[]
+}
+
+model HotelAmenityMapping {
+  id        String       @id @default(uuid())
+  hotelId   String
+  amenityId String
+  amenity   HotelAmenity @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+  hotel     Hotel        @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  @@unique([hotelId, amenityId])
+  @@index([amenityId], map: "HotelAmenityMapping_amenityId_fkey")
+}
+
+model RoomPricing {
+  id        String @id @default(uuid())
+  roomId    String @unique
+  price3hr  Float?
+  price6hr  Float?
+  price12hr Float?
+  price24hr Float?
+  room      Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+}
+
+model DynamicPricing {
+  id          String  @id @default(uuid())
+  roomId      String
+  type        String  @default("DATE")
+  date        String?
+  dayOfWeek   Int?
+  price3hr    Float?
+  price6hr    Float?
+  price12hr   Float?
+  price24hr   Float?
+  description String? @db.Text
+  room        Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, date])
+  @@unique([roomId, dayOfWeek])
+}
+
+model RoomImage {
+  id       String @id @default(uuid())
+  roomId   String
+  imageUrl String @db.Text
+  room     Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId], map: "RoomImage_roomId_fkey")
+}
+
+model HotelImage {
+  id       String @id @default(uuid())
+  hotelId  String
+  imageUrl String @db.Text
+  hotel    Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  @@index([hotelId], map: "HotelImage_hotelId_fkey")
+}
+
+model Booking {
+  id               String       @id @default(uuid())
+  userId           String
+  roomId           String
+  startTime        DateTime
+  durationType     String
+  totalPrice       Float
+  numAdults        Int          @default(1)
+  numChildren      Int          @default(0)
+  purposeId        String?
+  status           String       @default("PENDING")
+  rejectionReason  String?      @db.Text
+  paymentStatus    String       @default("UNPAID")
+  paymentMethod    String?
+  transactionId    String?
+  createdAt        DateTime     @default(now())
+  checkedInAt      DateTime?
+  checkedOutAt     DateTime?
+  attachedDocument String?      @db.Text
+  purpose          StayPurpose? @relation(fields: [purposeId], references: [id])
+  room             Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([purposeId], map: "Booking_purposeId_fkey")
+  @@index([roomId], map: "Booking_roomId_fkey")
+  @@index([userId], map: "Booking_userId_fkey")
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  userId    String
+  hotelId   String
+  roomId    String?
+  rating    Int
+  comment   String?  @db.Text
+  createdAt DateTime @default(now())
+  hotel     Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  room      Room?    @relation(fields: [roomId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([hotelId], map: "Review_hotelId_fkey")
+  @@index([roomId], map: "Review_roomId_fkey")
+  @@index([userId], map: "Review_userId_fkey")
+}
+
+model Favorite {
+  id      String @id @default(uuid())
+  userId  String
+  hotelId String
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, hotelId])
+  @@index([hotelId], map: "Favorite_hotelId_fkey")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  message   String   @db.Text
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  link      String?  @db.Text
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "Notification_userId_fkey")
+}
+
+model LocationCountry {
+  id        String             @id @default(uuid())
+  name      String             @unique
+  districts LocationDistrict[]
+}
+
+model LocationDistrict {
+  id        String          @id @default(uuid())
+  name      String
+  countryId String
+  cities    LocationCity[]
+  country   LocationCountry @relation(fields: [countryId], references: [id], onDelete: Cascade)
+
+  @@unique([name, countryId])
+  @@index([countryId], map: "LocationDistrict_countryId_fkey")
+}
+
+model LocationCity {
+  id         String           @id @default(uuid())
+  name       String
+  districtId String
+  district   LocationDistrict @relation(fields: [districtId], references: [id], onDelete: Cascade)
+
+  @@unique([name, districtId])
+  @@index([districtId], map: "LocationCity_districtId_fkey")
+}
+
+model Blog {
+  id        String      @id @default(uuid())
+  authorId  String
+  vendorId  String?
+  title     String
+  content   String      @db.LongText
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  author    User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  vendor    Vendor?     @relation(fields: [vendorId], references: [id])
+  images    BlogImage[]
+
+  @@index([authorId], map: "Blog_authorId_fkey")
+  @@index([vendorId], map: "Blog_vendorId_fkey")
+}
+
+model BlogImage {
+  id       String @id @default(uuid())
+  blogId   String
+  imageUrl String @db.Text
+  blog     Blog   @relation(fields: [blogId], references: [id], onDelete: Cascade)
+
+  @@index([blogId], map: "BlogImage_blogId_fkey")
+}
+
+model StayPurpose {
+  id       String                @id @default(uuid())
+  name     String                @unique
+  bookings Booking[]
+  hotels   HotelPurposeMapping[]
+}
+
+model HotelPurposeMapping {
+  id        String      @id @default(uuid())
+  hotelId   String
+  purposeId String
+  hotel     Hotel       @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  purpose   StayPurpose @relation(fields: [purposeId], references: [id], onDelete: Cascade)
+
+  @@unique([hotelId, purposeId])
+  @@index([purposeId], map: "HotelPurposeMapping_purposeId_fkey")
+}
+
+model EmergencyContact {
+  id        String   @id @default(uuid())
+  vendorId  String
+  name      String
+  phone     String
+  category  String
+  notes     String?  @db.Text
+  createdAt DateTime @default(now())
+  vendor    Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId], map: "EmergencyContact_vendorId_fkey")
+}
